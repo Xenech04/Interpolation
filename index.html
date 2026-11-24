@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calcul Automatique des Cumulés</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f4f4f9;
+        }
+        h2 {
+            color: #333;
+            border-bottom: 2px solid #0073aa;
+            padding-bottom: 5px;
+        }
+        .control-panel {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .control-panel textarea {
+            width: 100%;
+            height: 80px;
+            margin-bottom: 10px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-family: monospace;
+            box-sizing: border-box;
+        }
+        .control-panel button {
+            background-color: #0073aa;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 14px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .control-panel button:hover {
+            background-color: #005a87;
+        }
+        .table-container {
+            overflow-x: auto;
+            box-shadow: 0 4px 8px rgba(0,0,0,0.1);
+            background: white;
+            margin-bottom: 30px;
+            user-select: none; 
+        }
+        table {
+            border-collapse: collapse;
+            width: 100%;
+            font-size: 12px;
+            text-align: center;
+        }
+        th, td {
+            border: 1px solid #a0a0a0;
+            padding: 4px 6px;
+            min-width: 40px;
+            height: 20px;
+        }
+        thead th {
+            color: white;
+            font-weight: bold;
+        }
+        .header-top {
+            background-color: #002060;
+            height: 25px;
+        }
+        .header-sub {
+            background-color: #002060;
+        }
+        .header-email {
+            background-color: #00B0F0;
+        }
+        tbody td:first-child {
+            background-color: #D9E1F2;
+            font-weight: bold;
+            cursor: default;
+        }
+        td[contenteditable="true"] {
+            background-color: #ffffff;
+            cursor: cell;
+            outline: none;
+        }
+        td[contenteditable="true"]:focus {
+            background-color: #e6f2ff;
+            box-shadow: inset 0 0 0 2px #0073aa;
+        }
+        td.selected {
+            background-color: #b3d4ff !important;
+            box-shadow: inset 0 0 0 1px #005a87;
+        }
+        .auto-filled {
+            background-color: #fff9e6 !important;
+            color: #b35c00;
+            font-style: italic;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="control-panel">
+        <h3>Coller les données Excel ici</h3>
+        <p>Copiez vos données depuis Excel (à partir de la colonne "Heure"), collez-les ci-dessous et cliquez sur le bouton.</p>
+        <textarea id="excelPasteZone" placeholder="Collez vos données ici (Ctrl+V)..."></textarea>
+        <button onclick="fillTableFromTextarea()">Remplir le tableau</button>
+        <hr style="margin: 20px 0; border: 0; border-top: 1px solid #ddd;">
+        <p><strong>Astuces :</strong></p>
+        <ul>
+            <li>Sélectionnez des cellules (clic et glisser) puis faites <strong>Ctrl+V</strong> pour y coller des données.</li>
+            <li>Sélectionnez des cellules puis faites <strong>Ctrl+C</strong> pour les copier vers Excel.</li>
+            <li>Appuyez sur <strong>Suppr</strong> pour vider une sélection.</li>
+        </ul>
+    </div>
+
+    <h2>Tableau des Données Cumulées (Saisie et Interpolation)</h2>
+    <div class="table-container">
+        <table id="statsTable">
+            <thead>
+                <tr class="header-top">
+                    <th rowspan="2">Heure</th>
+                    <th colspan="4">Cumule Prévision</th>
+                    <th colspan="4">Cumule Capacitaire</th>
+                    <th colspan="4">Reçus Cumulés</th>
+                    <th colspan="4">Traités Cumulés</th>
+                    <th colspan="4">Traités 60sec Cumulés</th>
+                    <th colspan="4" class="header-email">Email Cumulé</th>
+                    <th colspan="4" class="header-email">Capacitaire EmailCumulé</th>
+                </tr>
+                <tr class="header-sub">
+                    <th>HYPER</th><th>AFR</th><th>DRIVE</th><th>SAV</th>
+                    <th>HYPER</th><th>AFR</th><th>DRIVE</th><th>SAV</th>
+                    <th>HYPER</th><th>AFR</th><th>DRIVE</th><th>SAV</th>
+                    <th>HYPER</th><th>AFR</th><th>DRIVE</th><th>SAV</th>
+                    <th>HYPER</th><th>AFR</th><th>DRIVE</th><th>SAV</th>
+                    <th class="header-email">BACKLOG</th><th class="header-email">RECUS</th><th class="header-email">TRAITES</th><th class="header-email">QS</th>
+                    <th class="header-email">HYPER</th><th class="header-email">AFR</th><th class="header-email">DRIVE</th><th class="header-email">SAV</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr><td contenteditable="true">8</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">9</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">10</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">11</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">12</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">13</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">14</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">15</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">16</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">17</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">18</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">19</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+                <tr><td contenteditable="true">20</td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td><td contenteditable="true"></td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <script>
+        const table = document.getElementById('statsTable');
+        const tableBody = table.tBodies[0];
+        
+        let isSelecting = false;
+        let startRow = -1, startCol = -1;
+        let currentRow = -1, currentCol = -1;
+
+        // --- SÉLECTION MULTIPLE (CLIC & GLISSER) ---
+        tableBody.addEventListener('mousedown', function(e) {
+            const cell = e.target.closest('td');
+            
+            if (cell && cell.cellIndex > 0) {
+                isSelecting = true;
+                clearSelection();
+                
+                startRow = cell.parentElement.sectionRowIndex; 
+                startCol = cell.cellIndex;
+                currentRow = startRow;
+                currentCol = startCol;
+                
+                highlightSelection();
+                e.preventDefault(); 
+                cell.focus();
+            }
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (!isSelecting) return;
+            
+            const elem = document.elementFromPoint(e.clientX, e.clientY);
+            if (!elem) return;
+            
+            const cell = elem.closest('td');
+            if (cell && cell.parentElement.parentElement === tableBody && cell.cellIndex > 0) {
+                const r = cell.parentElement.sectionRowIndex;
+                const c = cell.cellIndex;
+                
+                if (r !== currentRow || c !== currentCol) {
+                    currentRow = r;
+                    currentCol = c;
+                    highlightSelection();
+                }
+            }
+        });
+
+        document.addEventListener('mouseup', function() {
+            isSelecting = false;
+        });
+
+        function highlightSelection() {
+            clearSelection();
+            const minRow = Math.min(startRow, currentRow);
+            const maxRow = Math.max(startRow, currentRow);
+            const minCol = Math.min(startCol, currentCol);
+            const maxCol = Math.max(startCol, currentCol);
+
+            for (let r = minRow; r <= maxRow; r++) {
+                for (let c = minCol; c <= maxCol; c++) {
+                    if (tableBody.rows[r] && tableBody.rows[r].cells[c]) {
+                        tableBody.rows[r].cells[c].classList.add('selected');
+                    }
+                }
+            }
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('#statsTable .selected').forEach(el => el.classList.remove('selected'));
+        }
+
+        // --- COPIE (CTRL+C) ---
+        table.addEventListener('copy', function(e) {
+            const selectedCells = document.querySelectorAll('#statsTable .selected');
+            if (selectedCells.length === 0) return; 
+
+            // Si on édite une seule cellule, on laisse le comportement natif
+            if (selectedCells.length === 1 && window.getSelection().toString() !== "") {
+                return; 
+            }
+
+            e.preventDefault(); 
+
+            let minR = Infinity, maxR = -Infinity, minC = Infinity, maxC = -Infinity;
+            selectedCells.forEach(cell => {
+                const r = cell.parentElement.sectionRowIndex;
+                const c = cell.cellIndex;
+                if (r < minR) minR = r;
+                if (r > maxR) maxR = r;
+                if (c < minC) minC = c;
+                if (c > maxC) maxC = c;
+            });
+
+            // On stocke chaque ligne dans un tableau
+            let rowsText = []; 
+
+            for (let r = minR; r <= maxR; r++) {
+                let rowData = [];
+                for (let c = minC; c <= maxC; c++) {
+                    const cell = tableBody.rows[r].cells[c];
+                    rowData.push(cell.innerText.trim() || ""); 
+                }
+                rowsText.push(rowData.join("\t")); // Tabulation entre les colonnes
+            }
+
+            // On assemble le tout avec des sauts de ligne, SANS saut à la fin
+            const clipboardText = rowsText.join("\n");
+
+            e.clipboardData.setData('text/plain', clipboardText);
+            
+            // Feedback visuel
+            const originalColor = selectedCells[0].style.backgroundColor;
+            selectedCells.forEach(cell => cell.style.backgroundColor = '#a0d4a0');
+            setTimeout(() => {
+                selectedCells.forEach(cell => cell.style.backgroundColor = originalColor);
+            }, 200);
+        });
+
+        // --- SUPPRIMER LE CONTENU DES CELLULES SÉLECTIONNÉES ---
+        document.addEventListener('keydown', function(e) {
+            if ((e.key === 'Delete' || e.key === 'Backspace') && document.querySelectorAll('#statsTable .selected').length > 0) {
+                const active = document.activeElement;
+                if (active && active.classList.contains('selected') && active.innerText.length > 0 && document.querySelectorAll('#statsTable .selected').length === 1) {
+                    return; 
+                }
+                
+                e.preventDefault();
+                document.querySelectorAll('#statsTable .selected').forEach(cell => {
+                    cell.innerText = '0';
+                });
+                calculateMissingData();
+            }
+        });
+
+        // --- MÉTHODE 1 : Depuis la zone de texte ---
+        function fillTableFromTextarea() {
+            const text = document.getElementById('excelPasteZone').value;
+            if (!text.trim()) {
+                alert("Veuillez coller des données dans la zone de texte d'abord.");
+                return;
+            }
+            processPastedData(text, 0, 0);
+            document.getElementById('excelPasteZone').value = ''; 
+        }
+
+        // --- MÉTHODE 2 : Coller directement dans le tableau ---
+        table.addEventListener('paste', function(e) {
+            e.preventDefault(); 
+            const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+            if (!text) return;
+
+            let targetRow = -1;
+            let targetCol = -1;
+
+            const selectedCells = document.querySelectorAll('#statsTable .selected');
+            if (selectedCells.length > 0) {
+                let minR = Infinity, minC = Infinity;
+                selectedCells.forEach(cell => {
+                    const r = cell.parentElement.sectionRowIndex;
+                    const c = cell.cellIndex;
+                    if (r < minR) minR = r;
+                    if (c < minC) minC = c;
+                });
+                targetRow = minR;
+                targetCol = minC;
+            } else {
+                const active = document.activeElement;
+                if (active && active.tagName === 'TD' && active.cellIndex > 0) {
+                    targetRow = active.parentElement.sectionRowIndex;
+                    targetCol = active.cellIndex;
+                }
+            }
+
+            if (targetRow !== -1 && targetCol !== -1) {
+                processPastedData(text, targetRow, targetCol);
+            }
+        });
+
+        // --- TRAITEMENT DES DONNÉES COLLÉES ---
+        function processPastedData(text, startRowIndex, startColIndex) {
+            const rows = text.split(/\r?\n/).filter(row => row.trim() !== '');
+            const tableRows = tableBody.rows;
+
+            for (let r = 0; r < rows.length; r++) {
+                const rowData = rows[r].split('\t');
+                const targetRowIndex = startRowIndex + r;
+                
+                if (targetRowIndex >= tableRows.length) break; 
+
+                for (let c = 0; c < rowData.length; c++) {
+                    const targetColIndex = startColIndex + c;
+                    if (targetColIndex >= tableRows[targetRowIndex].cells.length) break;
+
+                    let data = rowData[c].replace(/\r/g, '').trim();
+                    tableRows[targetRowIndex].cells[targetColIndex].innerText = data === "" ? "0" : data;
+                }
+            }
+            clearSelection();
+            calculateMissingData();
+        }
+
+        // --- CALCUL DES DONNÉES MANQUANTES ---
+        table.addEventListener('input', function(e) {
+            if (e.target.tagName === 'TD') {
+                clearTimeout(window.calcTimeout);
+                window.calcTimeout = setTimeout(calculateMissingData, 500);
+            }
+        });
+
+        function calculateMissingData() {
+            const rows = tableBody.rows;
+            const numRows = rows.length;
+            const startCol = 9; 
+            const endCol = 28; 
+
+            document.querySelectorAll('.auto-filled').forEach(cell => {
+                cell.innerText = '0'; 
+                cell.classList.remove('auto-filled');
+            });
+
+            for (let col = startCol; col <= endCol; col++) {
+                let lastValidIndex = -1;
+                let lastValidValue = 0;
+
+                for (let row = 0; row < numRows; row++) {
+                    const cell = rows[row].cells[col];
+                    if (!cell) continue;
+
+                    let valStr = cell.innerText.trim().replace(/\s/g, '').replace(',', '.');
+                    let val = parseFloat(valStr);
+                    if (isNaN(val)) val = 0;
+
+                    if (val !== 0) {
+                        if (lastValidIndex !== -1 && (row - lastValidIndex) > 1) {
+                            let steps = row - lastValidIndex;
+                            let diff = val - lastValidValue;
+                            let stepValue = diff / steps;
+
+                            for (let i = 1; i < steps; i++) {
+                                let interpCell = rows[lastValidIndex + i].cells[col];
+                                let interpVal = lastValidValue + (stepValue * i);
+
+                                if (col >= 17 && col <= 20) {
+                                    interpCell.innerText = interpVal.toFixed(2).replace('.', ',');
+                                } else {
+                                    interpCell.innerText = Math.round(interpVal);
+                                }
+                                interpCell.classList.add('auto-filled');
+                            }
+                        }
+                        lastValidIndex = row;
+                        lastValidValue = val;
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>
